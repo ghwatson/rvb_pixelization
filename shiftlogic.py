@@ -7,7 +7,7 @@ Created on Aug 13, 2013
 import math
 from bresenham import raster_disk
 
-#removes duplicates in a list whilst preserving order
+#removes duplicates in a list whilst preserving order.
 def remove_duplicates(seq):
 	seen = set()
 	seen_add = seen.add
@@ -43,9 +43,9 @@ def create_layers(L):
 	return layer_idx, points
 
 # Order the points in a layer starting from (R,0) and going around CCW.
-# TODO: we only needed the octant here for ordering...consider just working
-# with octants as opposed to the full thing.
-# Note: The diagonal values get double-counted.
+# Notes: The diagonal values get double-counted.  There is some redundancy in
+#        the logic in that raster_disks generates the whole disk, but the
+#        function below only needs a quadrant.
 def order_disk_layer(layer,R,origin):
 	(x0,y0) = origin
 	# Move points to origin

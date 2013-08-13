@@ -51,6 +51,7 @@ import shiftlogic
 # ^
 # |
 # ---> x
+# TODO: Not true! But not a problem at the moment.
 def printRegion(mat):
 	for bla in reversed(mat):
 		print ' '.join(map(str, bla))
@@ -70,8 +71,8 @@ def printMatToFile(mat,filename,option):
 	m.write('\n')
 	m.close()
 
-# A general data structure for use in filling out shift files in a general
-# manner. The user supplies the logic for providing layers, bins and points.
+# A data structure for use in filling out shift files in a general manner.
+# The user supplies the logic for providing layers, bins and points.
 # CONSTRUCTION:
 # points: a 1d list of tuples representing the points, in order of shift
 #		  value assignment.
@@ -81,6 +82,9 @@ def printMatToFile(mat,filename,option):
 # bin_idx: Similar to layer_idx, but instead the indices defining the bins
 # 		 used for a single swap ratio.
 # shift_state: A list of the shift values of the points.
+#
+# NOTE: This has only been tested for the disk layering. Test before using
+# in other ways.
 class RegionData(object):
 	def __init__(self,L,max_add,create_layers,create_bin_partition):
 		# Get the layer_idx (ex shells of disk, or columns of square).
