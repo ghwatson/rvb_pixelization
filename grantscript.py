@@ -41,69 +41,9 @@ mult = 40
 #if you change this you need to recompile
 ## -- End of Mario's script leftovers --
 
-import math
 import os
 import subprocess
-
-# Returns a list of tuples along a line between the beginning and end.
-# Only works for horizontal lines as of now. The points are ordered from
-# right-to-left.
-def get_horizontal_line(begin,end):
-	line = []
-	if begin[0] < end[0]:
-		sgn = 1
-	else:
-		sgn = -1
-	for i in xrange( sgn*(end[0] - begin[0]) + 1 ):
-		newpt = (begin[0] + i*sgn, begin[1])
-		line.append(newpt)
-	return line
-	
-# Provides the rasterized version of a disk using a slightly altered version
-# of the Bresenham circle algorithm:
-#	 http://en.wikipedia.org/wiki/Midpoint_circle_algorithm
-# The ordering of the points in the set is like so:
-#			  9
-#		   8  7  6
-#		5  4  3  2  1
-#		  10 11  12
-#			 13
-def raster_disk(x0,y0,radius):
-	# Generate the coordinates.
-	f = 1 - radius
-	ddF_x = 1
-	ddF_y = -2 * radius
-	x = 0
-	y = radius
-	
-	coords = []
-	
-	coords.append((x0, y0 + radius))
-	coords.append((x0, y0 - radius))
-	right = (x0 + radius, y0)
-	left = (x0 - radius, y0)
-	coords = coords + get_horizontal_line(right, left)
-	
-	while x < y :
-#		 ddF_x == 2 * x + 1
-#		 ddF_y == -2 * y
-#		 f == x*x + y*y - radius*radius + 2*x - y + 1
-		if f >= 0:
-			y -= 1
-			ddF_y += 2
-			f += ddF_y
-		x += 1
-		ddF_x += 2
-		f += ddF_x	
-		
-		line1 = get_horizontal_line((x0 + x, y0 + y), (x0 - x, y0 + y))
-		line2 = get_horizontal_line((x0 + x, y0 - y), (x0 - x, y0 - y))
-		line3 = get_horizontal_line((x0 + y, y0 + x), (x0 - y, y0 + x))
-		line4 = get_horizontal_line((x0 + y, y0 - x), (x0 - y, y0 - x))
-		
-		coords = coords + line1 + line2 + line3 + line4
-
-	return coords
+import shiftlogic
 
 # Prints matrix so that x,y is oriented in the conventional manner.
 # Looks like:
@@ -129,39 +69,51 @@ def printMatToFile(mat,filename,option):
 		m.write(" ".join(i) + "\n") 
 	m.write('\n')
 	m.close()
-	
+
+# A general data structure for use in filling out shift files in a general
+# manner. The user supplies the logic for providing layers, bins and points.
+# CONSTRUCTION:
+# points: a 1d list of tuples representing the points, in order of shift
+#		  value assignment.
+# layer_idx: a list of indexes of points defining the layers.
+# 		Example: If we have  [p0 | p1 p2 p3 | p4 p5 | p6], where | defines a
+# 			 	 layer, then layer_idx = [1,4,6,7].
+# bin_idx: Similar to layer_idx, but instead the indices defining the bins
+# 		 used for a single swap ratio.
+# shift_state: A list of the shift values of the points.
 class RegionData(object):
-	def __init__(self,L,create_layers,create_bin_partition):
-		# Get the layers (ex shells of disk, or columns of square).
-		self.layers, self.points = create_layers(L)
-		self.values = [0 for x in xrange(self.layers[-1])]
+	def __init__(self,L,max_add,create_layers,create_bin_partition):
+		# Get the layer_idx (ex shells of disk, or columns of square).
+		self.layer_idx, self.points = create_layers(L)
+		self.bin_idx = create_bin_partition(self.layer_idx,max_add)
 		
-		self.bins = create_bin_partition(self.layers)
+		# Initialize the shift shift_state of the points to 0.
+		self.shift_state = [0 for x in xrange(len(self.points))]
 	
-	# Get the rth bin of values.
+	# Get the rth bin of shift_state.
 	def get_bin(self, r):
 		if r is not 0:
-			begin = self.bins[r-1]
-			end = self.bins[r]
+			begin = self.bin_idx[r-1]
+			end = self.bin_idx[r]
 		else:
 			begin = end = 0
-		return self.values[begin:end]
+		return self.shift_state[begin:end]
 	
 	# Set the rth bin to value.
 	def set_bin(self, r, value):
 		if r is not 0:
-			begin = self.bins[r-1]
-			end = self.bins[r]
+			begin = self.bin_idx[r-1]
+			end = self.bin_idx[r]
 		else:
 			begin = 0
 			end = 1
-		self.values[begin:end] = [value for x in xrange(end-begin)]
+		self.shift_state[begin:end] = [value for x in xrange(end-begin)]
 		
 	# Returns a 2darray of 0s and 1s that represents the current cartesian 
 	# state of the data.
 	def generate_shiftmap(self,canvas_L):
 		canvas = [[0 for x in xrange(canvas_L)] for x in xrange(canvas_L)]
-		for i, value in enumerate(self.values):
+		for i, value in enumerate(self.shift_state):
 			# Break once a 0 is reached.
 			if not value:
 				break
@@ -169,84 +121,6 @@ class RegionData(object):
 			(x,y) = self.points[i]
 			canvas[x][y] = value
 		return canvas
-
-#removes duplicates in a list whilst preserving order
-def remove_duplicates(seq):
-	seen = set()
-	seen_add = seen.add
-	return [ x for x in seq if x not in seen and not seen_add(x) ]
-
-# Create circles with integer radii.
-def create_layers(L):
-	layer_idx = []
-	points = []
-	x0 = y0 = int(math.floor(L/4))
-	max_r = int(math.ceil(L/4))
-	
-	# Initialize first layer.
- 	points.append((x0,y0))
- 	layer_idx.append(1)
-
-	# Collect all the disks full of points.
-	rasterdisks = {}
-	rasterdisks[0] = [points[0]]
-	for r in xrange(1,max_r):
-		rasterdisks[r] = raster_disk(x0,y0,r)
-
-	# Build the layers.
-	for r in xrange(1,max_r):
-   		layer_of_points = [x for x in rasterdisks[r] if x not in rasterdisks[r-1]]
-		layer_of_points = remove_duplicates(layer_of_points)
-		layer_of_points = order_disk_layer(layer_of_points,r,(x0,y0))
-		layer_of_points = remove_duplicates(layer_of_points)
-		
-		points = points + layer_of_points
-		layer_idx.append(len(points))
-		
-	return layer_idx, points
-
-# Order the points in a layer starting from (R,0) and going around CCW.
-# TODO: we only needed the octant here for ordering...consider just working
-# with octants as opposed to the full thing.
-# Note: The diagonal values get double-counted.
-def order_disk_layer(layer,R,origin):
-	(x0,y0) = origin
-	# Move points to origin
-	layer = [(pt[0] - x0,pt[1] - y0) for pt in layer]
-	
-	# Remove points not in first octant.
-	quad0 = [ pt for pt in layer if (pt[0] > 0 and pt[1] > 0) ]
-		
-	# Perform sorting.
-	quad0 = sorted(quad0, key = lambda pt: pt[1]/pt[0])
-	
-	# Use symmetry to build up the rest of the ordered layer.
-	quad1 = [i for i in reversed([(-pt[0],pt[1]) for pt in quad0])]
-	semi0 = quad0 + [(0,R)] + quad1
-	semi1 = [i for i in reversed([(pt[0],-pt[1]) for pt in semi0])]
-	circle = [(R,0)] + semi0 + [(-R,0)] + semi1
-	
-	# Shift back via origin
-	ordered_layer = [(pt[0] + x0, pt[1] + y0) for pt in circle]
-	
-	return ordered_layer
-	
-# Return the id's denoting the starts of bins.
-def create_bin_partition(layers):
-	
-	id_prev = 0
-	bins = []
-	for id in layers:
-		num_in_layer = id - id_prev
-		numBin = int(math.ceil(num_in_layer*1.0/max_add))
-		binSize = int(math.ceil(num_in_layer*1.0/numBin))
-		
-		bins = bins + [id_prev + j*binSize for j in xrange(1,numBin)]
-		bins.append(id_prev + num_in_layer)
-		
-		id_prev = id
-		
-	return bins
 
 #- this is somehow necessary, because of some glitch or something.....
 # L=4
@@ -278,10 +152,10 @@ def main():
 		print "mkdir " + runDir + "/" + Ldir
 		
 		# Create region data.
-		region = RegionData(L,create_layers,create_bin_partition)
+		region = RegionData(L,max_add,shiftlogic.create_layers,shiftlogic.create_bin_partition)
 		
 		#- Loop over the swap ratios (r)
-		for r in xrange(0,len(region.bins)):
+		for r in xrange(0,len(region.bin_idx)):
 			# Setup directories
 			rDir = "r" + str(r).zfill(3)
 			currentDir = runDir+"/" + Ldir + "/" + rDir 
@@ -298,11 +172,11 @@ def main():
 			sname = "%s/shift.txt" % currentDir
 			
 			shift = region.generate_shiftmap(L)
-# 			printRegion(shift)
+#  			printRegion(shift)
 			printMatToFile(shift,sname,'w')
 			region.set_bin(r,1) # increment by a bin.
 			shift = region.generate_shiftmap(L)
-# 			printRegion(shift)
+#  			printRegion(shift)
 			printMatToFile(shift,sname,'a')
 
 main()
