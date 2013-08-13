@@ -1,6 +1,8 @@
 '''
 Created on Aug 13, 2013
 
+Provides the logic for filling out disks for use in grantscript.
+
 @author: grant
 '''
 

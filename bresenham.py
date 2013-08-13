@@ -1,3 +1,12 @@
+'''
+Created on Aug 13, 2013
+
+A module providing Bresenham's circle algorithm, altered to provide a disk.
+Ref: http://en.wikipedia.org/wiki/Midpoint_circle_algorithm
+
+@author: grant
+'''
+
 # Returns a list of tuples along a line between the beginning and end.
 # Only works for horizontal lines as of now. The points are ordered from
 # right-to-left.
@@ -16,11 +25,11 @@ def get_horizontal_line(begin,end):
 # of the Bresenham circle algorithm:
 #     http://en.wikipedia.org/wiki/Midpoint_circle_algorithm
 # The ordering of the points in the set is like so:
-#              9
-#           8  7  6
+#          13 11 12   
+#       10  9  8  7  6
 #        5  4  3  2  1
-#          10 11  12
-#             13
+#       18 17 16 15 14
+#          21 20 19
 def raster_disk(x0,y0,radius):
     # Generate the coordinates.
     f = 1 - radius
