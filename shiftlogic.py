@@ -53,7 +53,7 @@ def order_disk_layer(layer,R,origin):
 	# Move points to origin
 	layer = [(pt[0] - x0,pt[1] - y0) for pt in layer]
 	
-	# Remove points not in first octant.
+	# Remove points not in first quadrant.
 	quad0 = [ pt for pt in layer if (pt[0] > 0 and pt[1] > 0) ]
 		
 	# Perform sorting.
