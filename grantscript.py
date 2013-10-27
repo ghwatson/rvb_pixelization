@@ -13,13 +13,13 @@ runDir = "square7"
 max_add = 8
 
 #- the first simulation size
-min_L= 56
+min_L= 4
 
 #- last (or > last) simulation size
-max_L = 73
+max_L = 36
 
 #- Step size for system sizes (LxL simulations)
-step_L = 4
+step_L = 1
 
 #- length of simulations (a million MC steps times this number)
 mult = 40
@@ -43,7 +43,7 @@ mult = 40
 
 import os
 import subprocess
-import shiftlogic
+import shiftlogic_offsite as shiftlogic
 
 # Prints matrix so that x,y is oriented in the conventional manner.
 # Looks like:
@@ -110,7 +110,7 @@ class RegionData(object):
 			end = self.bin_idx[r]
 		else:
 			begin = 0
-			end = 1
+			end = self.bin_idx[r]
 		self.shift_state[begin:end] = [value for x in xrange(end-begin)]
 		
 	# Returns a 2darray of 0s and 1s that represents the current cartesian 
@@ -176,11 +176,11 @@ def main():
 			sname = "%s/shift.txt" % currentDir
 			
 			shift = region.generate_shiftmap(L)
-#  			printRegion(shift)
+#    			printRegion(shift)
 			printMatToFile(shift,sname,'w')
 			region.set_bin(r,1) # increment by a bin.
 			shift = region.generate_shiftmap(L)
-#  			printRegion(shift)
+   			printRegion(shift)
 			printMatToFile(shift,sname,'a')
 
 main()
